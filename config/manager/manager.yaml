@@ -91,6 +91,12 @@ spec:
           requests:
             cpu: 10m
             memory: 64Mi
-        volumeMounts: []
-      volumes: []
+        volumeMounts:
+        - name: operator-config
+          mountPath: /etc/agent-sandbox-operator/config
+          readOnly: true
+      volumes:
+      - name: operator-config
+        configMap:
+          name: agent-sandbox-operator-config
       terminationGracePeriodSeconds: 10

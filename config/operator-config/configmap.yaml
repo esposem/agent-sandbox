@@ -1,0 +1,14 @@
+# Example operator configuration. Set enableExtensions to "true" to enable
+# the extensions controllers (SandboxClaim, SandboxWarmPool) without modifying
+# the manager deployment args. The controller reads this ConfigMap at startup.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agent-sandbox-operator-config
+  namespace: agent-sandbox-system
+  labels:
+    app.kubernetes.io/name: agent-sandbox-operator
+    app.kubernetes.io/managed-by: kustomize
+data:
+  # Set to "true" to enable extensions (equivalent to --extensions=true on the manager).
+  enableExtensions: "true"
