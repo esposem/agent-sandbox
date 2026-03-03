@@ -21,6 +21,7 @@ import (
 	"net/http/pprof"
 	"os"
 	"runtime"
+	"strings"
 	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -55,13 +56,21 @@ func main() {
 	var enablePprofDebug bool
 	var pprofBlockProfileRate int
 	var pprofMutexProfileFraction int
+
+	// Default for --extensions from ConfigMap (agent-sandbox-operator-config.enableExtensions).
+	// An explicit --extensions on the command line overrides this.
+	extensionsDefault := false
+	if b, err := os.ReadFile("/etc/agent-sandbox-operator/config/enableExtensions"); err == nil {
+		extensionsDefault = strings.TrimSpace(string(b)) == "true"
+	}
+
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", true,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.StringVar(&leaderElectionNamespace, "leader-election-namespace", "", "The namespace in which the leader election resource will be created.")
-	flag.BoolVar(&extensions, "extensions", false, "Enable extensions controllers.")
+	flag.BoolVar(&extensions, "extensions", extensionsDefault, "Enable extensions controllers.")
 	flag.BoolVar(&enableTracing, "enable-tracing", false, "Enable OpenTelemetry tracing via OTLP.")
 	flag.BoolVar(&enablePprof, "enable-pprof", false,
 		"Enable CPU profiling endpoint (/debug/pprof/profile) on the metrics server.")
