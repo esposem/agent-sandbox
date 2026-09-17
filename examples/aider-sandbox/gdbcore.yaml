@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: gdump-fedora-pod
+  labels:
+    app: gdump-toolkit
+spec:
+  # Replace this with the exact name of your target Kubernetes node
+  nodeName: "aro-cluster-jndhs-8mcqc-worker-westus-hdr45"
+  # Allows the pod to see and interact with all processes on the host node
+  hostPID: true
+  containers:
+  - name: gdump-container
+    image: fedora:latest
+    # Keeps the container running in the background
+    command: [ "/bin/bash", "-c", "--" ]
+    args: [ "dnf install -y gdb procps-ng && sleep infinity" ]
+    securityContext:
+      # Grants full administrative privileges to the container
+      privileged: true
+      capabilities:
+        add:
+          # Specifically required for attaching to processes and dumping memory
+          - SYS_PTRACE
+    volumeMounts:
+    - name: dump-storage
+      mountPath: /dumps
+  volumes:
+  - name: dump-storage
+    # Temporary storage for your dumped files.
+    emptyDir: {}

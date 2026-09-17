@@ -1,0 +1,99 @@
+apiVersion: extensions.agents.x-k8s.io/v1beta1
+kind: SandboxTemplate
+metadata:
+  name: aider-browser-template-coco
+  namespace: default
+spec:
+  envVarsInjectionPolicy: Disallowed
+  networkPolicy:
+    egress:
+      - ports:
+          - port: 5353
+            protocol: UDP
+          - port: 5353
+            protocol: TCP
+      - ports:
+          - port: 443
+            protocol: TCP
+    ingress:
+      - ports:
+          - port: 8501
+            protocol: TCP
+  networkPolicyManagement: Managed
+  podTemplate:
+    spec:
+      runtimeClassName: kata-remote
+      volumes:
+        - name: workspace-volume
+          emptyDir:
+            sizeLimit: 10Gi
+        - name: decryption-key
+          secret:
+            secretName: openai-sealed
+      containers:
+        - env:
+            - name: OPENAI_API_KEY_PATH
+              value: /sealed/decryption/llm-secrets
+            - name: OPENAI_API_KEY_TEST
+              valueFrom:
+                secretKeyRef:
+                  key: llm-secrets
+                  name: openai-sealed
+                  optional: true
+          image: quay.io/eesposit/aider
+          imagePullPolicy: Always
+          name: aider
+          ports:
+            - containerPort: 8501
+              protocol: TCP
+          volumeMounts:
+            - name: decryption-key
+              mountPath: "/sealed/decryption"
+            - mountPath: /workspace
+              name: workspace-volume
+          workingDir: /workspace
+      initContainers:
+        - command:
+            - /bin/sh
+            - '-c'
+            - |
+              # Only clone if the directory is empty to avoid crashing on restarts
+              if [ ! -d /workspace/.git ]; then
+                echo "Cloning $REPO_URL..."
+                # Retry loop to wait for the network to initialize
+                retries=5
+                mkdir -p /tmp/repo
+                while [ $retries -gt 0 ]; do
+                  if git clone "$REPO_URL" /tmp/repo; then
+                    cp -R /tmp/repo/. /workspace/
+                    rm -rf /tmp/repo
+                    break
+                  fi
+                  echo "Network not ready, retrying in 3 seconds... ($retries attempts left)"
+                  rm -rf /tmp/repo
+                  sleep 3
+                  retries=$((retries-1))
+                done
+
+                # Fail the container if all retries are exhausted
+                if [ $retries -eq 0 ]; then
+                  echo "Fatal: Failed to clone repository after multiple attempts."
+                  exit 1
+                fi
+              else
+                echo "/workspace is already populated. Skipping clone."
+              fi
+              chown -R 1000:1000 /workspace
+          env:
+            - name: REPO_URL
+              value: 'https://github.com/kubernetes-sigs/agent-sandbox.git'
+          image: 'bitnami/git:latest'
+          name: git-clone
+          volumeMounts:
+            - mountPath: /workspace
+              name: workspace-volume
+          workingDir: /workspace
+      restartPolicy: OnFailure
+      securityContext:
+        fsGroup: 1000
+  service: true
